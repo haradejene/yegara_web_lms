@@ -13,14 +13,13 @@ export type Profile = {
   email: string | null
   role: 'member' | 'admin'
   created_at: string
-  full_name?: string | null
-  avatar_url?: string | null
-  bio?: string | null
-  location?: string | null
-  website?: string | null
-  updated_at?: string | null
+  full_name: string | null
+  avatar_url: string | null
+  bio: string | null
+  location: string | null
+  website: string | null
+  updated_at: string | null
 }
-
 export type Enrollment = {
   id: string
   user_id: string

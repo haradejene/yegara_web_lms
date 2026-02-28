@@ -1,5 +1,5 @@
-import { redirect } from "next/navigation"
 import { createSupabaseServerClient } from "@/lib/supabaseServer"
+import { redirect } from "next/navigation"
 import { Course, Profile, Enrollment } from "@/types/types"
 import Link from "next/link"
 import Navbar from "../../components/Navbar"
@@ -10,46 +10,123 @@ import StudentStats from "../../components/student/StudentStats"
 import StudentCourses from "../../components/student/StudentCourses"
 
 interface Props {
-  params: {
-    id: string
-  }
+  params: Promise<{ id: string }> // Note: params is a Promise
 }
 
 export default async function StudentProfile({ params }: Props) {
+  // ✅ IMPORTANT: Await the params
+  const { id } = await params
+  
+  console.log("=== DEBUG: StudentProfile Page ===")
+  console.log("1. Profile ID from params:", id)
+  
   const supabase = await createSupabaseServerClient()
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
+  
+  // Get the current user
+  const { data: { user }, error: userError } = await supabase.auth.getUser()
+  
+  if (userError || !user) {
+    console.error("Auth error:", userError)
     redirect("/login")
   }
 
-  // Fetch profile
+  // Try to fetch the profile
   const { data: profileData, error: profileError } = await supabase
     .from("profiles")
     .select("*")
-    .eq("id", params.id)
-    .single()
+    .eq("id", id) // Now id is properly defined
+    .maybeSingle()
 
-  if (profileError || !profileData) {
-    console.error("Profile fetch error:", profileError)
-    redirect("/login")
+  if (profileError) {
+    console.error("Profile error details:", profileError)
+  }
+
+  // If no profile exists and this is the current user, create one
+  if (!profileData && user.id === id) {
+    console.log("Creating profile for current user")
+    
+    const { data: newProfile, error: insertError } = await supabase
+      .from("profiles")
+      .insert([
+        {
+          id: user.id,
+          email: user.email,
+          role: 'member',
+          created_at: new Date().toISOString()
+        }
+      ])
+      .select()
+      .single()
+
+    if (insertError) {
+      console.error("Error creating profile:", insertError)
+      redirect("/")
+    }
+
+    // Use the newly created profile
+    const profile = newProfile as Profile
+
+    // Fetch courses
+    const { data: coursesData } = await supabase
+      .from("courses")
+      .select("*")
+
+    return (
+      <>
+        <Navbar />
+        <main className="student-profile-page">
+          <div className="container">
+            <StudentHeader
+              student={{
+                name: profile.full_name || profile.email?.split('@')[0] || 'User',
+                email: profile.email || '',
+                role: profile.role,
+                avatar_url: profile.avatar_url || undefined
+              }}
+              isOwnProfile={true}
+            />
+
+            <StudentStats stats={{ enrolledCourses: 0, completedCourses: 0 }} />
+
+            <StudentInfoCard 
+              student={{
+                bio: "Welcome to your learning dashboard! Update your bio in profile settings."
+              }}
+              joinDate={new Date(profile.created_at).toLocaleDateString()}
+              location="Not specified"
+            />
+
+            <div className="empty-state">
+              <div className="empty-icon">📚</div>
+              <h3>No enrolled courses yet</h3>
+              <p>Start your learning journey by enrolling in a course</p>
+              <Link href="/courses" className="btn btn-primary">
+                Browse Courses
+              </Link>
+            </div>
+          </div>
+        </main>
+        <Footer />
+      </>
+    )
+  }
+
+  if (!profileData) {
+    console.log("No profile found and not current user, redirecting")
+    redirect("/")
   }
 
   const profile = profileData as Profile
-  const isOwnProfile = user.id === params.id
+  const isOwnProfile = user.id === id
 
-  // Fetch user's enrollments with course details
+  // Fetch enrollments and courses...
   const { data: enrollmentsData } = await supabase
     .from("enrollments")
     .select("*, course:courses(*)")
-    .eq("user_id", params.id)
+    .eq("user_id", id)
 
   const enrollments = (enrollmentsData as (Enrollment & { course: Course })[]) || []
 
-  // Fetch all courses (for recommended section)
   const { data: allCoursesData } = await supabase
     .from("courses")
     .select("*")
@@ -57,20 +134,12 @@ export default async function StudentProfile({ params }: Props) {
 
   const allCourses = (allCoursesData as Course[]) || []
 
-  // Calculate stats
   const enrolledCourses = enrollments.map(e => e.course)
   const completedCourses = enrollments.filter(e => e.completed)
-  const inProgressCourses = enrollments.filter(e => !e.completed && e.progress > 0)
   
-  const totalProgress = enrollments.length 
-    ? Math.round(enrollments.reduce((acc, e) => acc + e.progress, 0) / enrollments.length)
-    : 0
-
   const stats = {
-    enrolledCourses: enrolledCourses.length,
-    completedCourses: completedCourses.length,
-    inProgressCourses: inProgressCourses.length,
-    totalProgress
+    enrolledCourses: enrollments.length,
+    completedCourses: completedCourses.length
   }
 
   const joinDate = new Date(profile.created_at).toLocaleDateString('en-US', {
@@ -106,45 +175,25 @@ export default async function StudentProfile({ params }: Props) {
             location={profile.location || "Not specified"}
           />
 
-          {/* Show enrolled courses first */}
-          {enrolledCourses.length > 0 && (
+          {enrolledCourses.length > 0 ? (
             <StudentCourses 
               courses={enrolledCourses} 
-              title="My Courses"
-              showProgress={true}
-              enrollments={enrollments}
+              title={isOwnProfile ? "My Courses" : "Enrolled Courses"}
+              showProgress={isOwnProfile}
+              enrollments={isOwnProfile ? enrollments : null}
             />
-          )}
-
-          {/* Show recommended courses (non-enrolled) */}
-          {allCourses.length > enrolledCourses.length && (
-            <div className="recommended-section">
-              <h2 className="section-title">Recommended for You</h2>
-              <div className="courses-grid">
-                {allCourses
-                  .filter(c => !enrolledCourses.some(ec => ec.id === c.id))
-                  .slice(0, 3)
-                  .map(course => (
-                    <div key={course.id} className="course-card">
-                      <div className="course-image">
-                        <img 
-                          src={course.thumbnail_url || "https://via.placeholder.com/400x250"} 
-                          alt={course.title}
-                        />
-                        <span className="course-type">
-                          {course.content_type === 'video' ? '🎥' : '📄'}
-                        </span>
-                      </div>
-                      <div className="course-content">
-                        <h3>{course.title}</h3>
-                        <p>{course.description}</p>
-                        <Link href={`/courses/${course.id}`} className="btn btn-primary btn-small">
-                          View Course
-                        </Link>
-                      </div>
-                    </div>
-                  ))}
-              </div>
+          ) : isOwnProfile ? (
+            <div className="empty-state">
+              <div className="empty-icon">📚</div>
+              <h3>No enrolled courses yet</h3>
+              <p>Start your learning journey by enrolling in a course</p>
+              <Link href="/courses" className="btn btn-primary">
+                Browse Courses
+              </Link>
+            </div>
+          ) : (
+            <div className="empty-state">
+              <p>No enrolled courses yet.</p>
             </div>
           )}
         </div>

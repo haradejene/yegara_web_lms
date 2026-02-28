@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { supabase } from "../../lib/supabaseClient"
+import { getSupabaseClient } from "../../lib/supabaseClient"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { User } from "@supabase/supabase-js"
@@ -21,43 +21,68 @@ export default function Dashboard() {
 
   useEffect(() => {
     const checkSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) {
+      try {
+        const supabase = getSupabaseClient()
+        const { data: { session }, error } = await supabase.auth.getSession()
+        
+        if (error) {
+          console.error("Session error:", error)
+        }
+        
+        if (!session) {
+          console.log("No session found, redirecting to login")
+          router.push("/login")
+        } else {
+          console.log("Session found for user:", session.user.email)
+          setUser(session.user)
+          await fetchData(session.user.id)
+          setLoading(false)
+        }
+      } catch (error) {
+        console.error("Auth check error:", error)
         router.push("/login")
-      } else {
-        setUser(session.user)
-        await fetchData(session.user.id)
-        setLoading(false)
       }
     }
+    
     checkSession()
   }, [router])
 
   const fetchData = async (userId: string) => {
-    // Fetch all courses
-    const { data: coursesData } = await supabase
-      .from("courses")
-      .select("*")
-      .order("created_at", { ascending: false })
+    try {
+      const supabase = getSupabaseClient()
+      
+      // Fetch all courses
+      const { data: coursesData, error: coursesError } = await supabase
+        .from("courses")
+        .select("*")
+        .order("created_at", { ascending: false })
 
-    setCourses(coursesData || [])
+      if (coursesError) {
+        console.error("Error fetching courses:", coursesError)
+      } else {
+        setCourses(coursesData || [])
+      }
 
-    // Fetch user's enrollments
-    const { data: enrollmentsData } = await supabase
-      .from("enrollments")
-      .select("*, course:courses(*)")
-      .eq("user_id", userId)
+      // Fetch user's enrollments
+      const { data: enrollmentsData, error: enrollmentsError } = await supabase
+        .from("enrollments")
+        .select("*, course:courses(*)")
+        .eq("user_id", userId)
 
-    setEnrollments((enrollmentsData as (Enrollment & { course: Course })[]) || [])
+      if (enrollmentsError) {
+        console.error("Error fetching enrollments:", enrollmentsError)
+      } else {
+        setEnrollments((enrollmentsData as (Enrollment & { course: Course })[]) || [])
+      }
+    } catch (error) {
+      console.error("Fetch data error:", error)
+    }
   }
 
   // Calculate stats
-  const enrolledCourses = enrollments.map(e => e.course)
-  const completedCourses = enrollments.filter(e => e.completed)
-  
   const stats = {
     enrolledCourses: enrollments.length,
-    completedCourses: completedCourses.length
+    completedCourses: enrollments.filter(e => e.completed).length
   }
 
   // Filter courses by type
@@ -72,6 +97,9 @@ export default function Dashboard() {
       <p>Loading your dashboard...</p>
     </div>
   )
+
+  // If no user after loading, don't render (will redirect)
+  if (!user) return null
 
   return (
     <>
@@ -93,8 +121,8 @@ export default function Dashboard() {
                   Browse All Courses →
                 </Link>
                 <Link href={`/students/${user?.id}`} className="btn btn-secondary btn-large">
-  View My Profile
-</Link>
+                  View My Profile
+                </Link>
               </div>
             </div>
             
@@ -142,11 +170,11 @@ export default function Dashboard() {
         )}
 
         {/* My Learning Section */}
-        {enrolledCourses.length > 0 && (
+        {enrollments.length > 0 && (
           <section className="section">
             <div className="container">
               <StudentCourses 
-                courses={enrolledCourses} 
+                courses={enrollments.map(e => e.course)} 
                 title="Continue Learning"
                 showProgress={true}
                 enrollments={enrollments}
