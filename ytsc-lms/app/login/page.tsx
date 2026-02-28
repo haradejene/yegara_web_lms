@@ -24,12 +24,34 @@ export default function LoginPage() {
       password,
     })
 
-    setLoading(false)
-
     if (error) {
       setError(error.message)
-    } else {
-      router.push("/dashboard")
+      setLoading(false)
+      return
+    }
+
+    // After successful login, fetch the user's profile to get their role
+    if (data.user) {
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", data.user.id)
+        .single()
+
+      setLoading(false)
+
+      if (profileError) {
+        console.error("Error fetching profile:", profileError)
+        router.push("/dashboard") // Default fallback
+        return
+      }
+
+      // Redirect based on role
+      if (profile?.role === "admin") {
+        router.push("/admin")
+      } else {
+        router.push("/dashboard")
+      }
     }
   }
 

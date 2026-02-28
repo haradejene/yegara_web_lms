@@ -1,36 +1,8 @@
+import type { Metadata } from 'next'
 import './globals.css'
-import localFont from 'next/font/local'
-
-const nokiaHeadline = localFont({
-  src: [
-    {
-      path: '../public/FONTS/amharic font/nokiapureheadline_bold.otf',
-      weight: '700',
-      style: 'normal',
-    },
-  ],
-  variable: '--font-heading',
-})
-
-const einaFont = localFont({
-  src: [
-    {
-      path: '../public/FONTS/Eina/Eina03-Regular.ttf',
-      weight: '400',
-      style: 'normal',
-    },
-    {
-      path: '../public/FONTS/Eina/Eina03-SemiBold.ttf',
-      weight: '600',
-      style: 'normal',
-    },
-  ],
-  variable: '--font-body',
-})
-
-export const metadata = {
-  title: 'Yegara Trading Share Company',
-  description: 'Innovation. Trading. Growth.',
+export const metadata: Metadata = {
+  title: 'YTSC- Learning Management System',
+  description: 'Learning Management System',
 }
 
 export default function RootLayout({
@@ -40,6 +12,30 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" data-scroll-behavior="smooth">
+      <head>
+        {/* Add proper preload attributes for fonts */}
+        <link
+          rel="preload"
+          href="/_next/static/media/Eina03_Regular-s.p.b550ad43.ttf"
+          as="font"
+          type="font/ttf"
+          crossOrigin="anonymous"
+        />
+        <link
+          rel="preload"
+          href="/_next/static/media/Eina03_SemiBold-s.p.4995d6c5.ttf"
+          as="font"
+          type="font/ttf"
+          crossOrigin="anonymous"
+        />
+        <link
+          rel="preload"
+          href="/_next/static/media/nokiapureheadline_bold-s.p.638885c6.otf"
+          as="font"
+          type="font/otf"
+          crossOrigin="anonymous"
+        />
+      </head>
       <body>{children}</body>
     </html>
   )

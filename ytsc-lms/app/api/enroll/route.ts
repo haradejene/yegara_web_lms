@@ -3,11 +3,11 @@ import { NextResponse } from 'next/server'
 
 export async function POST(request: Request) {
   try {
-    const { courseId } = await request.json()
+    const formData = await request.formData()
+    const courseId = formData.get('courseId') as string
     
     const supabase = await createSupabaseServerClient()
     
-    // Get the current user
     const { data: { user }, error: userError } = await supabase.auth.getUser()
     
     if (userError || !user) {
@@ -26,14 +26,11 @@ export async function POST(request: Request) {
       .single()
 
     if (existingEnrollment) {
-      return NextResponse.json(
-        { error: 'Already enrolled in this course' },
-        { status: 400 }
-      )
+      return NextResponse.redirect(new URL(`/courses/${courseId}`, request.url))
     }
 
     // Create enrollment
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from('enrollments')
       .insert([
         {
@@ -45,8 +42,6 @@ export async function POST(request: Request) {
           last_accessed: new Date().toISOString()
         }
       ])
-      .select()
-      .single()
 
     if (error) {
       console.error('Enrollment error:', error)
@@ -56,7 +51,7 @@ export async function POST(request: Request) {
       )
     }
 
-    return NextResponse.json({ success: true, enrollment: data })
+    return NextResponse.redirect(new URL(`/courses/${courseId}`, request.url))
   } catch (error) {
     console.error('Server error:', error)
     return NextResponse.json(
