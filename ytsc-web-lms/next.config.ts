@@ -21,7 +21,6 @@ const nextConfig: NextConfig = {
         port: '',
         pathname: '/storage/v1/object/public/**',
       },
-      // Add any other image domains you use
       {
         protocol: 'https',
         hostname: 'placehold.co',
@@ -35,6 +34,10 @@ const nextConfig: NextConfig = {
         pathname: '/**',
       },
     ],
+  },
+  // Add this to fix the Turbopack root warning
+  turbopack: {
+    root: process.cwd(),
   },
 }
 

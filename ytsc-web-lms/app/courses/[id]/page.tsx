@@ -3,7 +3,7 @@ import { notFound } from "next/navigation"
 import Link from "next/link"
 import Navbar from "@/app/components/lms/Navbar"  // Fixed import
 import Footer from "@/app/components/lms/Footer"  // Fixed import
-import CourseContent from "@/app/components/lms/CourseContent"  // Fixed import (removed extra 'a')
+import CourseContent from "@/app/components/lms/courses/CourseContaint"  // Fixed import (removed extra 'a')
 import { Course, CourseModule, Lesson, Enrollment, LessonProgress } from "@/types/types"
 
 interface Props {
