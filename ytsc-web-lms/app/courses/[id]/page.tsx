@@ -134,7 +134,7 @@ export default async function CourseDetail({ params }: Props) {
                     </div>
                   </div>
                 ) : (
-                  <form action="/api/enroll" method="POST">
+                  <form action="/lms/api/enroll" method="POST">
                     <input type="hidden" name="courseId" value={course.id} />
                     <button type="submit" className="btn btn-primary btn-large">
                       Enroll Now
